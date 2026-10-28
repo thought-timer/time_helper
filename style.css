@@ -1,0 +1,409 @@
+/* =========================================================
+   생각 기록 타이머 - style.css
+   색상은 발표 자료(베이지 / 크림 / 세이지) 톤에 맞춤
+   ========================================================= */
+
+:root {
+  --bg: #F5EEE8;        /* 배경 베이지 */
+  --card: #FFFFFF;
+  --cream: #F5EDDA;     /* 크림 */
+  --sage: #CFD1C7;      /* 세이지 */
+  --primary: #8C8B79;   /* 주요 버튼 */
+  --text: #3A3A3A;
+  --muted: #8A877D;
+  --line: #EEEAE2;
+  --field: #FCFAF7;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+
+body {
+  font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  padding: 32px 16px;
+}
+
+/* ---------- 헤더 ---------- */
+.app-header { max-width: 1100px; margin: 0 auto 24px; }
+.app-header h1 { font-size: 28px; font-weight: 800; }
+.subtitle { color: var(--muted); }
+
+/* ---------- 전체 배치 (메인 화면) ---------- */
+.layout {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    "timer  memo"
+    "record vault";
+  gap: 20px;
+  align-items: start;
+}
+.timer-card  { grid-area: timer; }
+.memo-card   { grid-area: memo; }
+.vault-card  { grid-area: vault; }
+.record-card { grid-area: record; }
+
+@media (max-width: 760px) {
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-areas: "timer" "memo" "vault" "record";
+  }
+}
+
+.card {
+  background: var(--card);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.card h2 { font-size: 18px; margin-bottom: 16px; }
+.card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.card-head h2 { margin: 0; }
+
+/* ---------- 공통 입력 / 버튼 ---------- */
+input, select, textarea {
+  font: inherit;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #E4E0D8;
+  border-radius: 12px;
+  background: var(--field);
+  color: inherit;
+}
+textarea { resize: vertical; }
+input:disabled { color: var(--muted); }
+
+.btn {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--bg);
+  color: var(--text);
+}
+.btn.primary { background: var(--primary); color: #fff; }
+.btn.danger  { background: #EBD9D3; color: #8A4B3E; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.toast {
+  min-height: 1.4em;
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--primary);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.toast.show { opacity: 1; }
+
+.muted { color: var(--muted); font-size: 14px; }
+.empty { color: var(--muted); text-align: center; padding: 24px 0; list-style: none; }
+
+/* ---------- ① 타이머 ---------- */
+.mode-tabs {
+  display: inline-flex;
+  background: var(--bg);
+  border-radius: 999px;
+  padding: 4px;
+  margin-bottom: 12px;
+}
+.mode-btn, .hist-tab {
+  border: 0;
+  background: transparent;
+  padding: 6px 16px;
+  border-radius: 999px;
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+}
+.mode-btn.active, .hist-tab.active { background: #fff; color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.mode-btn:disabled { cursor: not-allowed; }
+
+/* 뽀모도로 시간 설정 */
+.pomo-settings { display: flex; gap: 16px; margin-bottom: 12px; }
+.pomo-settings label { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); }
+.pomo-settings input {
+  width: 64px;
+  padding: 6px 8px;
+  text-align: center;
+  color: var(--text);
+}
+
+.timer-display {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 16px 0;
+  padding: 28px 16px;
+  border-radius: 16px;
+  text-align: center;
+  background: var(--cream);
+  transition: background 0.3s;
+}
+/* 뽀모도로 휴식 시간에는 색을 바꿔서 구분 */
+.timer-card[data-phase="break"] .timer-display { background: var(--sage); }
+
+.phase-label { font-size: 14px; color: var(--muted); }
+.time-text   { font-size: 52px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+.study-total { font-size: 13px; color: var(--muted); min-height: 1.2em; }
+
+.timer-controls { display: flex; gap: 8px; }
+.timer-controls .btn { flex: 1; }
+
+/* ---------- ② 메모 입력 / 카테고리 ---------- */
+#memoForm { display: flex; flex-direction: column; gap: 8px; }
+
+/* 카테고리 버튼 — 선택된 버튼만 진한 색 */
+.cat-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.cat-btn {
+  border: 1px solid #E4E0D8;
+  border-radius: 999px;
+  padding: 6px 14px;
+  background: var(--field);
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.cat-btn:hover { background: var(--cream); color: var(--text); }
+.cat-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.category-manage { margin-top: 12px; }
+.category-manage summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+#categoryForm { display: flex; gap: 8px; margin: 10px 0; }
+#categoryForm .btn { flex-shrink: 0; }
+
+.chip-list { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--cream);
+  font-size: 12px;
+}
+.chip-x { border: 0; background: none; cursor: pointer; color: var(--muted); font-size: 14px; line-height: 1; }
+
+/* ---------- ③ 보관함 ---------- */
+#filterSelect { width: auto; padding: 6px 10px; }
+
+.vault-locked {
+  text-align: center;
+  padding: 40px 16px;
+  border-radius: 16px;
+  background: var(--bg);
+}
+.lock-icon { font-size: 36px; margin-bottom: 8px; }
+
+.date-head { font-size: 13px; color: var(--muted); margin: 16px 0 8px; }
+.date-head:first-child { margin-top: 0; }
+
+.memo-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.memo-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--field);
+}
+.memo-meta { display: flex; gap: 8px; align-items: center; }
+.memo-time { font-size: 12px; color: var(--muted); }
+.memo-text { grid-column: 1; white-space: pre-wrap; word-break: break-word; }
+.del-btn {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.del-btn:hover { color: #8A4B3E; }
+
+/* ---------- ④ 공부 기록 그래프 ---------- */
+.week-chart { display: flex; gap: 8px; height: 150px; margin: 16px 0; }
+.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; }
+.bar-wrap { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+.bar { width: 100%; min-height: 2px; border-radius: 6px 6px 0 0; background: var(--sage); }
+.bar-col.today .bar { background: var(--primary); }
+.bar-label, .bar-value { font-size: 12px; color: var(--muted); min-height: 1.5em; } /* 글자가 없어도 높이 유지 → 막대 바닥이 한 줄로 맞춰짐 */
+.bar-col.today .bar-label { color: var(--text); font-weight: 700; }
+
+/* "공부 기록" · "생각 보관함" 제목 버튼 */
+.title-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.title-btn:hover { color: var(--primary); }
+.title-arrow { font-size: 22px; line-height: 1; color: var(--muted); }
+
+/* ---------- ⑤⑥ 옆에서 열리는 창 (왼쪽: 공부 기록 / 오른쪽: 생각 보관함) ---------- */
+body.no-scroll { overflow: hidden; }
+
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: rgba(58, 58, 58, 0.35);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s, visibility 0.25s;
+}
+.drawer-backdrop.open { opacity: 1; visibility: visible; }
+
+.drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: 11;
+  width: 50vw;                /* 화면의 절반 정도 */
+  min-width: 380px;
+  max-width: 100vw;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 28px 24px;
+  overflow-y: auto;           /* 내용이 많으면 창 안에서 스크롤 */
+  background: var(--card);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.1);
+  visibility: hidden;
+  transition: transform 0.3s ease, visibility 0.3s;
+}
+.drawer-left  { left: 0;  border-radius: 0 24px 24px 0; transform: translateX(-100%); } /* 처음엔 왼쪽 밖에 숨어 있음 */
+.drawer-right { right: 0; border-radius: 24px 0 0 24px; transform: translateX(100%); }  /* 처음엔 오른쪽 밖에 숨어 있음 */
+.drawer.open  { transform: translateX(0); visibility: visible; }
+
+.sheet-head { display: flex; justify-content: space-between; align-items: center; }
+.sheet-head h2 { margin: 0; font-size: 18px; }
+.icon-close {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sheet-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.sheet-toolbar .mode-tabs { margin: 0; }
+.drawer-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.drawer-toolbar select { width: auto; padding: 6px 10px; }
+.period-nav { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+#periodLabel { min-width: 110px; text-align: center; }
+.nav-btn {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.summary-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stat { display: flex; flex-direction: column; padding: 12px 14px; border-radius: 14px; background: var(--bg); }
+.stat-label { font-size: 13px; color: var(--muted); }
+.stat strong { font-size: 18px; white-space: nowrap; }
+
+.history-chart { display: flex; gap: 4px; height: 200px; flex-shrink: 0; }
+.history-chart[data-view="month"] { gap: 2px; } /* 31일이라 막대 간격을 좁게 */
+.history-chart .bar-value,
+.history-chart .bar-label { font-size: 11px; white-space: nowrap; }
+
+.drawer-sub { font-size: 15px; margin-top: 4px; }
+.hint { font-size: 13px; color: var(--muted); margin: 2px 0 6px; }
+
+/* ---------- 공부 기록 목록 (누르면 이어서 공부) ---------- */
+.record-list { list-style: none; }
+.record-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2px 12px;
+  width: 100%;
+  padding: 10px 8px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.record-item:hover:not(:disabled):not(.static) { background: var(--field); }
+.record-item.static { cursor: default; } /* 전날 이전 기록: 누를 수 없음 */
+.record-item:disabled { cursor: not-allowed; opacity: 0.6; }
+.record-goal { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.record-meta { grid-column: 1; font-size: 12px; color: var(--muted); }
+.record-play {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.record-item:hover:not(:disabled) .record-play { background: var(--primary); color: #fff; }
+
+/* ---------- 메인 화면 보관함 미리보기 ---------- */
+.more-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px dashed #E4E0D8;
+  border-radius: 12px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.more-btn:hover { background: var(--field); color: var(--text); }
+
+/* 휴대폰처럼 좁은 화면: 창을 거의 꽉 차게, 막대 위 시간은 숨김 (총 시간은 위 요약 칸에서 확인) */
+@media (max-width: 760px) {
+  .drawer { width: 92vw; min-width: 0; padding: 24px 16px; }
+  .summary-row { gap: 8px; }
+  .stat { padding: 10px; }
+  .stat-label { font-size: 12px; }
+  .stat strong { font-size: 13px; }
+  .history-chart .bar-value { display: none; }
+  .history-chart .bar-label { font-size: 10px; }
+}

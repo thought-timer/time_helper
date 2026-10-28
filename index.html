@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>생각 기록 타이머</title>
+  <!-- 글꼴(인터넷이 없으면 기본 글꼴로 표시됨) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1>생각 기록 타이머</h1>
+    <p class="subtitle">잡생각은 적어 두고, 공부는 계속하기</p>
+  </header>
+
+  <main class="layout">
+
+    <!-- ① 공부 공간 : 타이머 -->
+    <section class="card timer-card" id="timerSection" data-phase="idle">
+      <h2>공부 타이머</h2>
+
+      <div class="mode-tabs">
+        <button class="mode-btn active" data-mode="normal">일반</button>
+        <button class="mode-btn" data-mode="pomodoro">뽀모도로</button>
+      </div>
+
+      <!-- 뽀모도로 모드일 때만 보이는 시간 설정 -->
+      <div id="pomoSettings" class="pomo-settings" hidden>
+        <label>집중 <input id="focusMin" type="number" min="1" max="120" step="1" inputmode="numeric"> 분</label>
+        <label>휴식 <input id="breakMin" type="number" min="1" max="60" step="1" inputmode="numeric"> 분</label>
+      </div>
+
+      <input id="goalInput" type="text" maxlength="40"
+             placeholder="오늘의 공부 목표 (예: 공학설계 보고서 2쪽)">
+
+      <div class="timer-display">
+        <span id="phaseLabel" class="phase-label">대기 중</span>
+        <span id="timeText" class="time-text">00:00:00</span>
+        <span id="studyTotal" class="study-total"></span>
+      </div>
+
+      <div class="timer-controls">
+        <button id="startBtn" class="btn primary">시작</button>
+        <button id="pauseBtn" class="btn" disabled>일시정지</button>
+        <button id="stopBtn" class="btn danger" disabled>종료</button>
+      </div>
+      <p id="timerToast" class="toast" aria-live="polite"></p>
+    </section>
+
+    <!-- ② 생각 보관 공간 : 메모 입력 -->
+    <section class="card memo-card">
+      <h2>떠오른 생각 적기</h2>
+      <form id="memoForm">
+        <div id="categoryButtons" class="cat-buttons" aria-label="카테고리 선택"></div>
+        <textarea id="memoInput" rows="3"
+                  placeholder="예) 택배 주문해야지  (Enter: 저장 / Shift+Enter: 줄바꿈)"></textarea>
+        <button type="submit" class="btn primary">보관함에 넣기</button>
+      </form>
+      <p id="memoToast" class="toast" aria-live="polite"></p>
+
+      <details class="category-manage">
+        <summary>카테고리 관리</summary>
+        <form id="categoryForm">
+          <input id="categoryInput" type="text" maxlength="10" placeholder="새 카테고리 이름">
+          <button type="submit" class="btn">추가</button>
+        </form>
+        <ul id="categoryList" class="chip-list"></ul>
+      </details>
+    </section>
+
+    <!-- ③ 생각 보관함 : 최근 3개만 미리 보여 주고, 이름을 누르면 오른쪽에서 전체 목록 창이 열림 -->
+    <section class="card vault-card">
+      <div class="card-head">
+        <h2>
+          <button id="openVault" class="title-btn" title="생각 보관함 전체 보기">
+            생각 보관함 <span class="title-arrow">›</span>
+          </button>
+        </h2>
+        <span id="vaultCount" class="muted"></span>
+      </div>
+
+      <div id="vaultPreviewLocked" class="vault-locked" hidden>
+        <div class="lock-icon">🔒</div>
+        <p>공부 중에는 보관함이 잠겨 있어요.</p>
+        <p class="muted">이번 공부에서 보관한 생각 <strong class="locked-count">0</strong>개</p>
+      </div>
+
+      <div id="vaultPreview"></div>
+    </section>
+
+    <!-- ④ 공부 기록 : 오늘 합계 + 최근 7일 그래프 -->
+    <section class="card record-card">
+      <h2>
+        <button id="openHistory" class="title-btn" title="월간 / 연간 기록 보기">
+          공부 기록 <span class="title-arrow">›</span>
+        </button>
+      </h2>
+      <p>오늘 공부 시간 <strong id="todayTotal">0분</strong></p>
+      <div id="weekChart" class="week-chart"></div>
+      <ul id="recordList" class="record-list"></ul>
+    </section>
+
+  </main>
+
+  <!-- 옆에서 열리는 창 뒤의 어두운 배경 (누르면 창이 닫힘) -->
+  <div id="drawerBackdrop" class="drawer-backdrop"></div>
+
+  <!-- ⑤ 공부 기록 자세히 보기 : "공부 기록"을 누르면 왼쪽에서 열리는 창 -->
+  <section id="historyDrawer" class="drawer drawer-left" role="dialog" aria-modal="true" aria-labelledby="historyTitle">
+    <div class="sheet-head">
+      <h2 id="historyTitle">공부 기록 자세히 보기</h2>
+      <button id="closeHistory" class="icon-close" aria-label="닫기">×</button>
+    </div>
+
+    <div class="sheet-toolbar">
+      <div class="mode-tabs">
+        <button class="hist-tab active" data-view="month">월간</button>
+        <button class="hist-tab" data-view="year">연간</button>
+      </div>
+      <div class="period-nav">
+        <button id="prevPeriod" class="nav-btn" aria-label="이전">‹</button>
+        <span id="periodLabel"></span>
+        <button id="nextPeriod" class="nav-btn" aria-label="다음">›</button>
+      </div>
+    </div>
+
+    <div class="summary-row">
+      <div class="stat"><span class="stat-label">총 공부 시간</span><strong id="statTotal">0분</strong></div>
+      <div class="stat"><span class="stat-label">공부한 날</span><strong id="statDays">0일</strong></div>
+      <div class="stat"><span class="stat-label">하루 평균</span><strong id="statAvg">-</strong></div>
+    </div>
+
+    <div id="historyChart" class="history-chart"></div>
+    <p id="historyEmpty" class="empty" hidden>이 기간에는 공부 기록이 없어요.</p>
+
+    <!-- 월간 보기에서만: 그 달의 공부 기록 목록 (누르면 이어서 공부) -->
+    <div id="historyListBox">
+      <h3 class="drawer-sub">이 달의 기록</h3>
+      <p class="hint">오늘 기록은 누르면 그 공부를 이어서 할 수 있어요.</p>
+      <ul id="historyList" class="record-list"></ul>
+    </div>
+  </section>
+
+  <!-- ⑥ 생각 보관함 전체 보기 : "생각 보관함"을 누르면 오른쪽에서 열리는 창 -->
+  <section id="vaultDrawer" class="drawer drawer-right" role="dialog" aria-modal="true" aria-labelledby="vaultTitle">
+    <div class="sheet-head">
+      <h2 id="vaultTitle">생각 보관함</h2>
+      <button id="closeVault" class="icon-close" aria-label="닫기">×</button>
+    </div>
+
+    <div class="drawer-toolbar">
+      <select id="filterSelect" aria-label="카테고리 필터"></select>
+      <span id="vaultTotal" class="muted"></span>
+    </div>
+
+    <div id="vaultLocked" class="vault-locked" hidden>
+      <div class="lock-icon">🔒</div>
+      <p>공부 중에는 보관함이 잠겨 있어요.</p>
+      <p class="muted">이번 공부에서 보관한 생각 <strong class="locked-count">0</strong>개</p>
+    </div>
+
+    <div id="vaultList"></div>
+  </section>
+
+  <script src="script.js"></script>
+</body>
+</html>
