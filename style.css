@@ -331,7 +331,7 @@ body.no-scroll { overflow: hidden; }
 }
 .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
-.summary-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.summary-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .stat { display: flex; flex-direction: column; padding: 12px 14px; border-radius: 14px; background: var(--bg); }
 .stat-label { font-size: 13px; color: var(--muted); }
 .stat strong { font-size: 18px; white-space: nowrap; }
@@ -400,10 +400,48 @@ body.no-scroll { overflow: hidden; }
 /* 휴대폰처럼 좁은 화면: 창을 거의 꽉 차게, 막대 위 시간은 숨김 (총 시간은 위 요약 칸에서 확인) */
 @media (max-width: 760px) {
   .drawer { width: 92vw; min-width: 0; padding: 24px 16px; }
-  .summary-row { gap: 8px; }
+  .summary-row { gap: 8px; grid-template-columns: repeat(2, 1fr); }
   .stat { padding: 10px; }
   .stat-label { font-size: 12px; }
   .stat strong { font-size: 13px; }
   .history-chart .bar-value { display: none; }
   .history-chart .bar-label { font-size: 10px; }
 }
+
+/* ---------- 하루 목표 시간 ---------- */
+.goal-box { margin-bottom: 4px; }
+.goal-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.link-btn {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.link-btn:hover { color: var(--text); }
+.goal-bar { height: 10px; margin-top: 10px; border-radius: 999px; background: var(--bg); overflow: hidden; }
+.goal-fill { width: 0; height: 100%; border-radius: 999px; background: var(--sage); transition: width 0.4s; }
+.goal-box.done .goal-fill { background: var(--primary); }       /* 목표 달성하면 진한 색 */
+.goal-text { margin-top: 6px; font-size: 13px; color: var(--muted); }
+.goal-box.done .goal-text { color: var(--text); font-weight: 600; }
+.goal-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--field);
+}
+.goal-form label { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); }
+.goal-form input { width: 60px; padding: 6px 8px; text-align: center; color: var(--text); }
+.btn.small { padding: 6px 14px; font-size: 13px; }
+
+/* ---------- 기록 파일로 저장하기 ---------- */
+.backup-box { padding-top: 16px; border-top: 1px solid var(--line); }
+.backup-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }

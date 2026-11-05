@@ -8,6 +8,8 @@
    4. 생각 메모        ← 생각 보관 공간
    5. 카테고리 관리
    6. 공부 기록
+      6-2. 하루 목표 시간
+      6-3. 기록 파일로 저장 / 불러오기
    7. 화면 그리기(render)
    8. 이벤트 연결 & 시작
    9. 앞으로 만들 기능 (TODO)
@@ -23,7 +25,10 @@ const KEYS = {
   categories: 'ttt.categories',
   records: 'ttt.records',
   pomodoro: 'ttt.pomodoro',
+  goal: 'ttt.dailyGoal',
 };
+
+const GOAL_MAX_MIN = 16 * 60; // 하루 목표는 최대 16시간
 
 // 뽀모도로 기본 시간(분) — 사용자가 화면에서 바꾸면 localStorage에 저장됨
 const DEFAULT_POMODORO = { focus: 25, break: 5 };
@@ -79,6 +84,8 @@ let selectedCategory = categories[0];                   // 메모 입력할 때 
 let historyView = 'month';                              // 기록 자세히 보기: 'month' | 'year'
 let historyCursor = new Date();                         // 기록 자세히 보기: 지금 보고 있는 달/연도
 let pomoSetting = { ...DEFAULT_POMODORO, ...load(KEYS.pomodoro, {}) }; // { focus: 분, break: 분 }
+let dailyGoal = load(KEYS.goal, 0);                     // 하루 목표 시간(분), 0이면 목표 없음
+let goalCelebrated = null;                              // 목표 달성 알림을 띄운 날짜 (하루에 한 번만)
 
 const saveTimer = () => save(KEYS.timer, timer);
 
@@ -189,6 +196,7 @@ function tick() {
         ? `집중 끝! ${pomoSetting.break}분 쉬어 가요 ☕`
         : '휴식 끝! 다시 집중해 볼까요 📚');
   }
+  renderGoal(); // 공부하는 동안 목표 진행 막대도 실시간으로
   renderTimer();
 }
 
@@ -299,6 +307,144 @@ function sumByDate() {
   const sums = {};
   records.forEach((r) => { sums[r.date] = (sums[r.date] || 0) + r.studyMs; });
   return sums;
+}
+
+// 오늘 공부한 시간 = 저장된 오늘 기록 + 지금 진행 중인 공부 (목표 막대가 실시간으로 차오르게)
+function todayStudyMs() {
+  const today = dateKey(new Date());
+  let ms = sumByDate()[today] || 0;
+  if (timer.active && dateKey(new Date(timer.sessionStart)) === today) {
+    ms += Math.max(0, totalStudyMs() - timer.resumeBase); // 이어하기면 이전 시간은 이미 기록에 들어 있음
+  }
+  return ms;
+}
+
+
+/* ---------- 6-2. 하루 목표 시간 ---------- */
+
+function setDailyGoal(minutes) {
+  dailyGoal = Math.min(GOAL_MAX_MIN, Math.max(0, Math.round(minutes) || 0));
+  save(KEYS.goal, dailyGoal);
+  goalCelebrated = null;
+}
+
+
+/* ---------- 6-3. 기록 파일로 저장 / 불러오기 ---------- */
+
+// 파일 내려받기 도우미
+function downloadFile(filename, text, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// 백업 파일(JSON): 기록 · 메모 · 카테고리 · 설정을 모두 담음 → 나중에 '백업 불러오기'로 되살릴 수 있음
+function exportBackup() {
+  const data = {
+    app: '생각 기록 타이머',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    records,
+    memos,
+    categories,
+    pomodoro: pomoSetting,
+    dailyGoal,
+  };
+  downloadFile(`생각기록타이머_백업_${dateKey(new Date())}.json`, JSON.stringify(data, null, 2), 'application/json');
+  showToast('backupToast', `기록 ${records.length}개, 메모 ${memos.length}개를 파일로 저장했어요.`);
+}
+
+// 엑셀에서 열 수 있는 CSV: 공부 기록만, 날짜순
+function exportCsv() {
+  const rows = [['날짜', '공부 목표', '모드', '공부 시간(분)', '끝난 시각']];
+  [...records]
+    .sort((a, b) => a.date.localeCompare(b.date) || a.endedAt - b.endedAt)
+    .forEach((r) => {
+      rows.push([
+        r.date,
+        r.goal || '',
+        r.mode === 'pomodoro' ? '뽀모도로' : '일반',
+        Math.round(r.studyMs / 60000),
+        `${dateKey(new Date(r.endedAt))} ${fmtTime(r.endedAt)}`,
+      ]);
+    });
+  const csv = rows.map((row) => row.map(csvCell).join(',')).join('\r\n');
+  // 맨 앞의 ﻿(BOM)가 있어야 엑셀에서 한글이 깨지지 않음
+  downloadFile(`생각기록타이머_공부기록_${dateKey(new Date())}.csv`, '﻿' + csv, 'text/csv;charset=utf-8');
+  showToast('backupToast', `공부 기록 ${records.length}개를 엑셀용 파일로 저장했어요.`);
+}
+
+// CSV 한 칸: 쉼표 · 따옴표 · 줄바꿈이 있으면 따옴표로 감싸고,
+// =, +, -, @ 로 시작하면 엑셀이 수식으로 읽지 않게 앞에 ' 를 붙임
+function csvCell(value) {
+  let text = String(value);
+  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+// 백업 파일 불러오기 — 지금 기록은 그대로 두고, 백업에만 있는 기록 · 메모를 더함 (같은 id는 건너뜀)
+function importBackup(file) {
+  if (timer.active) {
+    showToast('backupToast', '공부를 종료한 뒤에 불러와 주세요.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data = null;
+    try { data = JSON.parse(reader.result); } catch { /* 아래에서 처리 */ }
+    if (!data || !Array.isArray(data.records) || !Array.isArray(data.memos)) {
+      showToast('backupToast', '생각 기록 타이머의 백업 파일이 아니에요.');
+      return;
+    }
+
+    const recordIds = new Set(records.map((r) => r.id));
+    const newRecords = data.records
+      .filter((r) => r && r.id && /^\d{4}-\d{2}-\d{2}$/.test(r.date) && Number(r.studyMs) > 0 && !recordIds.has(r.id))
+      .map((r) => ({
+        id: String(r.id),
+        date: r.date,
+        studyMs: Number(r.studyMs),
+        mode: r.mode === 'pomodoro' ? 'pomodoro' : 'normal',
+        goal: String(r.goal || ''),
+        endedAt: Number(r.endedAt) || 0,
+      }));
+
+    const memoIds = new Set(memos.map((m) => m.id));
+    const newMemos = data.memos
+      .filter((m) => m && m.id && typeof m.text === 'string' && !memoIds.has(m.id))
+      .map((m) => ({
+        id: String(m.id),
+        text: m.text,
+        category: String(m.category || '기타'),
+        createdAt: Number(m.createdAt) || Date.now(),
+      }));
+
+    if (newRecords.length + newMemos.length === 0) {
+      showToast('backupToast', '새로 불러올 기록이 없어요. (이미 다 들어 있어요)');
+      return;
+    }
+    if (!confirm(`기록 ${newRecords.length}개, 메모 ${newMemos.length}개를 불러올까요?`)) return;
+
+    records.push(...newRecords);
+    memos.push(...newMemos);
+    // 백업에 있던 카테고리와 메모의 카테고리도 목록에 추가
+    [...(data.categories || []), ...newMemos.map((m) => m.category)].forEach((c) => {
+      if (typeof c === 'string' && c && !categories.includes(c)) categories.push(c);
+    });
+    save(KEYS.records, records);
+    save(KEYS.memos, memos);
+    save(KEYS.categories, categories);
+
+    renderAll();
+    renderHistory();
+    showToast('backupToast', `기록 ${newRecords.length}개, 메모 ${newMemos.length}개를 불러왔어요.`);
+  };
+  reader.readAsText(file);
 }
 
 
@@ -519,7 +665,7 @@ function renderVaultList() {
 function renderRecords() {
   const sums = sumByDate();
   const today = dateKey(new Date());
-  $('todayTotal').textContent = fmtDuration(sums[today] || 0);
+  renderGoal();
 
   const days = [];
   for (let i = 6; i >= 0; i--) {
@@ -558,6 +704,46 @@ function renderRecords() {
     list.append(el('li', 'empty', '오늘은 아직 기록이 없어요.'));
   }
   todays.forEach((r) => list.append(recordItem(r)));
+}
+
+// 목표 시간 표시 (예: 180 → '3시간', 150 → '2시간 30분', 45 → '45분')
+function fmtGoal(min) {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (h && m) return `${h}시간 ${m}분`;
+  return h ? `${h}시간` : `${m}분`;
+}
+
+// 하루 목표 — 오늘 공부 시간, 진행 막대, 남은 시간 / 달성 표시
+function renderGoal() {
+  const ms = todayStudyMs();
+  const today = dateKey(new Date());
+  $('todayTotal').textContent = fmtDuration(ms);
+
+  const hasGoal = dailyGoal > 0;
+  $('goalBar').hidden = !hasGoal;
+  $('goalEditBtn').textContent = hasGoal ? '목표 바꾸기' : '목표 설정';
+  if (!hasGoal) {
+    $('goalBox').classList.remove('done');
+    $('goalText').textContent = '하루 목표 시간을 정해 보세요.';
+    return;
+  }
+
+  const goalMs = dailyGoal * 60000;
+  const pct = Math.min(100, Math.floor((ms / goalMs) * 100));
+  const done = ms >= goalMs;
+  $('goalFill').style.width = `${pct}%`;
+  $('goalBox').classList.toggle('done', done);
+  $('goalText').textContent = done
+    ? `목표 ${fmtGoal(dailyGoal)} 달성! 🎉`
+    : `목표 ${fmtGoal(dailyGoal)} 중 ${pct}% · ${fmtDuration(goalMs - ms)} 남았어요`;
+
+  // 공부하다가 목표를 채우는 순간 한 번 알려 주기 (처음 열었을 때 이미 달성한 상태면 알림 없음)
+  if (goalCelebrated === null) goalCelebrated = done ? today : '';
+  if (done && goalCelebrated !== today) {
+    goalCelebrated = today;
+    showToast('timerToast', `🎉 오늘 목표 ${fmtGoal(dailyGoal)}을 달성했어요!`);
+  }
 }
 
 // 공부 기록 한 줄
@@ -643,6 +829,13 @@ function renderHistory() {
   $('statTotal').textContent = fmtDuration(total);
   $('statDays').textContent = `${days}일`;
   $('statAvg').textContent = days ? fmtDuration(total / days) : '-';
+
+  // 지금 목표 기준으로 목표를 채운 날 수
+  let goalDays = 0;
+  for (const key in sums) {
+    if (key.startsWith(periodPrefix) && dailyGoal && sums[key] >= dailyGoal * 60000) goalDays++;
+  }
+  $('statGoal').textContent = dailyGoal ? `${goalDays}일` : '목표 없음';
   $('historyEmpty').hidden = total > 0;
 
   // 이번 달(올해)보다 미래로는 못 넘어가게
@@ -874,6 +1067,42 @@ document.querySelectorAll('.hist-tab').forEach((tab) => {
   });
 });
 
+// 하루 목표 시간: '목표 설정'을 누르면 입력칸이 열림
+$('goalEditBtn').addEventListener('click', () => {
+  const form = $('goalForm');
+  form.hidden = !form.hidden;
+  if (!form.hidden) {
+    $('goalHour').value = Math.floor(dailyGoal / 60);
+    $('goalMin').value = dailyGoal % 60;
+    $('goalHour').focus();
+  }
+});
+
+$('goalForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const h = Number($('goalHour').value) || 0;
+  const m = Number($('goalMin').value) || 0;
+  setDailyGoal(h * 60 + m);
+  $('goalForm').hidden = true;
+  renderGoal();
+});
+
+$('goalClear').addEventListener('click', () => {
+  setDailyGoal(0);
+  $('goalForm').hidden = true;
+  renderGoal();
+});
+
+// 기록 파일로 저장 / 불러오기
+$('exportJson').addEventListener('click', exportBackup);
+$('exportCsv').addEventListener('click', exportCsv);
+$('importBtn').addEventListener('click', () => $('importFile').click());
+$('importFile').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) importBackup(file);
+  e.target.value = ''; // 같은 파일을 다시 골라도 동작하게
+});
+
 // 시작!
 renderAll();
 setInterval(tick, 250);
@@ -881,18 +1110,6 @@ setInterval(tick, 250);
 
 /* ---------- 9. 앞으로 만들 기능 (개발 일정 기준) ----------
 
-   TODO(11월 초) 하루 목표 시간
-     - localStorage에 'ttt.dailyGoal' (분 단위) 저장
-     - renderRecords()에서 오늘 합계 / 목표 비율을 진행 막대로 표시
-
-   TODO(11월 초) 기록 파일로 저장하기
-     function exportRecords() {
-       const blob = new Blob([JSON.stringify(records, null, 2)], { type: 'application/json' });
-       const a = document.createElement('a');
-       a.href = URL.createObjectURL(blob);
-       a.download = `study-records-${dateKey(new Date())}.json`;
-       a.click();
-     }
-
    TODO(11월 말) 사용 후기 반영 — 불편한 점 수정
+   (후보) 뽀모도로 전환 알림 소리, 메모 수정 기능
 */

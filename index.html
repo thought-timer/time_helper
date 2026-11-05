@@ -96,7 +96,22 @@
           공부 기록 <span class="title-arrow">›</span>
         </button>
       </h2>
-      <p>오늘 공부 시간 <strong id="todayTotal">0분</strong></p>
+      <!-- 하루 목표 시간 : 오늘 공부 시간 / 목표 → 진행 막대 -->
+      <div id="goalBox" class="goal-box">
+        <div class="goal-top">
+          <span>오늘 공부 시간 <strong id="todayTotal">0분</strong></span>
+          <button id="goalEditBtn" class="link-btn" type="button">목표 설정</button>
+        </div>
+        <div id="goalBar" class="goal-bar" hidden><div id="goalFill" class="goal-fill"></div></div>
+        <p id="goalText" class="goal-text">하루 목표 시간을 정해 보세요.</p>
+
+        <form id="goalForm" class="goal-form" hidden>
+          <label>하루 목표 <input id="goalHour" type="number" min="0" max="16" step="1" inputmode="numeric"> 시간</label>
+          <label><input id="goalMin" type="number" min="0" max="59" step="5" inputmode="numeric"> 분</label>
+          <button type="submit" class="btn small primary">저장</button>
+          <button id="goalClear" type="button" class="link-btn">목표 없애기</button>
+        </form>
+      </div>
       <div id="weekChart" class="week-chart"></div>
       <ul id="recordList" class="record-list"></ul>
     </section>
@@ -129,6 +144,7 @@
       <div class="stat"><span class="stat-label">총 공부 시간</span><strong id="statTotal">0분</strong></div>
       <div class="stat"><span class="stat-label">공부한 날</span><strong id="statDays">0일</strong></div>
       <div class="stat"><span class="stat-label">하루 평균</span><strong id="statAvg">-</strong></div>
+      <div class="stat"><span class="stat-label">목표 달성한 날</span><strong id="statGoal">-</strong></div>
     </div>
 
     <div id="historyChart" class="history-chart"></div>
@@ -139,6 +155,19 @@
       <h3 class="drawer-sub">이 달의 기록</h3>
       <p class="hint">오늘 기록은 누르면 그 공부를 이어서 할 수 있어요.</p>
       <ul id="historyList" class="record-list"></ul>
+    </div>
+
+    <!-- 기록 파일로 저장하기 / 불러오기 -->
+    <div class="backup-box">
+      <h3 class="drawer-sub">기록 파일로 저장하기</h3>
+      <p class="hint">기록은 지금 쓰는 브라우저에만 저장돼요. 브라우저 기록을 지우거나 다른 컴퓨터로 옮기기 전에 파일로 백업해 두세요.</p>
+      <div class="backup-buttons">
+        <button id="exportJson" class="btn primary" type="button">백업 파일 저장</button>
+        <button id="exportCsv" class="btn" type="button">엑셀용(CSV) 저장</button>
+        <button id="importBtn" class="btn" type="button">백업 불러오기</button>
+        <input id="importFile" type="file" accept=".json,application/json" hidden>
+      </div>
+      <p id="backupToast" class="toast" aria-live="polite"></p>
     </div>
   </section>
 
